@@ -6,7 +6,9 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include "nvapi.h"
 #pragma comment(lib, "wbemuuid.lib")
+#pragma comment(lib, "nvapi64.lib")
 
 
 #define okay(msg, ...) printf("[+] " msg "\n", ##__VA_ARGS__)

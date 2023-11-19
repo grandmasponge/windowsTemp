@@ -1,6 +1,6 @@
 #include "glassbox.hpp"
 
-int getgpu();
+int getgpuNvdia();
 int getMemory();
 int getdisks();
 int getWinVersion();
@@ -10,6 +10,7 @@ static std::string formfactor(UINT16 type);
 
 int main() {
 	getMemory();
+	getgpuNvdia();
 }
 
 int getMemory() {
@@ -158,6 +159,7 @@ int getMemory() {
 	pLoc->Release();
 	pEnumerator->Release();
 	CoUninitialize();
+	return 0;
 }
 
 static std::string formfactor(UINT16 type) {
@@ -241,4 +243,32 @@ static std::string formfactor(UINT16 type) {
 	};
 
 
+}
+
+// tehe im so silly
+
+int getgpuNvdia() {
+	info("getting Nvdia gpu information");
+	NvAPI_Status nstatus = NvAPI_Initialize();
+	NvU32 nhgpuTemprature = 0;
+	NvPhysicalGpuHandle hgpu;
+	NvU32 gpuamount;
+
+	if (nstatus != NVAPI_OK)
+	{
+		warn("failed to get nvapi initalized");
+		return EXIT_FAILURE;
+		NvAPI_Unload();
+	}
+	info("nvapi initalized");
+
+	nstatus = NvAPI_EnumPhysicalGPUs(&hgpu, &gpuamount);
+
+	if (nstatus != NVAPI_OK)
+	{
+		warn("failed to enumerate throught physical gpus");
+		NvAPI_Unload();
+	}
+	NvAPI_Unload();
+	return 0;
 }
