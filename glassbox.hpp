@@ -2,13 +2,17 @@
 #include<Windows.h>
 #include <comdef.h>
 #include <Wbemidl.h>
-#include<stdio.h>
+#include <stdio.h>
 #include <iostream>
 #include <vector>
 #include <cmath>
 #include "nvapi.h"
+#include <dxgi.h>
 #pragma comment(lib, "wbemuuid.lib")
 #pragma comment(lib, "nvapi64.lib")
+#pragma comment(lib, "dxgi.lib")
+
+
 
 
 #define okay(msg, ...) printf("[+] " msg "\n", ##__VA_ARGS__)

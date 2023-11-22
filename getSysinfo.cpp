@@ -1,16 +1,20 @@
 #include "glassbox.hpp"
 
 int getgpuNvdia();
+int getgpuAMD();
 int getMemory();
 int getdisks();
 int getWinVersion();
 int getMotherBoard();
 
-static std::string formfactor(UINT16 type);
+std::string formfactor(UINT16 type);
+int vendor();
+
 
 int main() {
 	getMemory();
 	getgpuNvdia();
+	vendor();
 }
 
 int getMemory() {
@@ -245,30 +249,137 @@ static std::string formfactor(UINT16 type) {
 
 }
 
-// tehe im so silly
+
 
 int getgpuNvdia() {
 	info("getting Nvdia gpu information");
 	NvAPI_Status nstatus = NvAPI_Initialize();
 	NvU32 nhgpuTemprature = 0;
 	NvPhysicalGpuHandle hgpu;
-	NvU32 gpuamount;
-
+	NvU32 gpuAmount;
+	
 	if (nstatus != NVAPI_OK)
 	{
 		warn("failed to get nvapi initalized");
-		return EXIT_FAILURE;
 		NvAPI_Unload();
 	}
 	info("nvapi initalized");
 
-	nstatus = NvAPI_EnumPhysicalGPUs(&hgpu, &gpuamount);
+	info("Enumerating through GPUS");
+	nstatus = NvAPI_EnumPhysicalGPUs(&hgpu, &gpuAmount);
 
 	if (nstatus != NVAPI_OK)
 	{
-		warn("failed to enumerate throught physical gpus");
-		NvAPI_Unload();
+		warn("failed to enumerate throught physical GPUS");
+		
 	}
+	//gpu version
+	NvAPI_ShortString ver;
+	NvAPI_GetInterfaceVersionString(ver);
+
+	//name
+	NvAPI_ShortString name;
+	nstatus = NvAPI_GPU_GetFullName(hgpu, name);
+	if (nstatus != NVAPI_OK)
+	{
+		warn("failed to get gpu name");
+	}
+
+	
+	
+	for (int i = 0; i <= gpuAmount -1; i++)
+	{
+		NV_GPU_CLOCK_FREQUENCIES_V2 freq = { NV_GPU_CLOCK_FREQUENCIES_VER_2 };
+
+		NV_GPU_MEMORY_INFO_EX meminfo = { NV_GPU_MEMORY_INFO_EX_VER };
+		NvAPI_GPU_GetMemoryInfoEx(hgpu, &meminfo);
+		
+
+		NV_GPU_THERMAL_SETTINGS thermalsettings;
+		thermalsettings.version = NV_GPU_THERMAL_SETTINGS_VER_2;
+		thermalsettings.sensor[0].controller = NVAPI_THERMAL_CONTROLLER_GPU_INTERNAL;
+		thermalsettings.sensor[0].target = NVAPI_THERMAL_TARGET_GPU;
+	
+	
+		nstatus = NvAPI_GPU_GetAllClockFrequencies(hgpu, &freq);
+		if (nstatus != NVAPI_OK)
+		{
+			warn("failed to get gpu freq");
+		}
+
+		nstatus = NvAPI_GPU_GetThermalSettings(hgpu, NVAPI_THERMAL_TARGET_ALL, &thermalsettings);
+
+
+
+		if (nstatus != NVAPI_OK)
+		{
+			warn("failed to get gpu thermal settings");
+		}
+		
+		int currentusage = meminfo.availableDedicatedVideoMemory - meminfo.curAvailableDedicatedVideoMemory;
+		float stuff = (float)currentusage / (float)meminfo.availableDedicatedVideoMemory * 100.f;
+		
+
+		std::cout << "\ngpu information:" << std::endl;
+		std::cout << "gpu ver: " << ver << std::endl;
+		std::cout << "gpu name: " << name << std::endl;
+		printf("Temp: %u C\n", static_cast<unsigned>(thermalsettings.sensor[i].currentTemp));
+		std::cout << "Base Clock: " << freq.domain[NVAPI_GPU_PUBLIC_CLOCK_GRAPHICS].frequency  << " kHz" << std::endl;
+		std::cout << "Memory Clock: " << freq.domain[NVAPI_GPU_PUBLIC_CLOCK_MEMORY].frequency  << " kHz" << std::endl;
+		std::cout << "avalible VRAM: " << meminfo.dedicatedVideoMemory/(1024*1024) << " MB\n";
+		std::cout << "Used VRAM: " << currentusage/(1024*1024) << " MB\n";
+		std::cout << "Used VRAM: " << stuff << " %\n";
+
+	}
+
 	NvAPI_Unload();
 	return 0;
+
 }
+
+
+int vendor() {
+	IDXGIFactory* dxgiFactory = nullptr;
+	HRESULT hr = CreateDXGIFactory(__uuidof(IDXGIFactory), reinterpret_cast<void**>(&dxgiFactory));
+	if (FAILED(hr))
+	{
+		warn("failed to create a connection to the dxgi lib");
+		dxgiFactory->Release();
+		return -1;
+	}
+	IDXGIAdapter* adapter;
+	hr = dxgiFactory->EnumAdapters(0, &adapter);
+	if (FAILED(hr))
+	{
+		warn("failed to enumerate through gpus");
+		dxgiFactory->Release();
+		return -1;
+	}
+	DXGI_ADAPTER_DESC gpudesc;
+	adapter->GetDesc(&gpudesc);
+
+	if (gpudesc.VendorId == 0x10de)
+	{
+		std::cout << "this is a nvdia corperation gpu" << std::endl;
+	}
+	else if (gpudesc.VendorId == 0x1002)
+	{
+		std::cout << "this is a amd corperation gpu" << std::endl;
+	}
+	else if (gpudesc.VendorId == 0x8086)
+	{
+		std::cout << "this is a intel corperation gpu" << std::endl;
+	}
+	else {
+		std::cout << "this is a unknown gpu" << std::endl;
+	}
+
+	return 0;
+}
+
+int getgpuAMD() {
+	return 0;
+}
+
+
+
