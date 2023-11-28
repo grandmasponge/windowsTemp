@@ -1,10 +1,24 @@
 #include "glassbox.hpp"
 
+#include<string>
+#include<Windows.h>
+#include <comdef.h>
+#include <Wbemidl.h>
+#include <stdio.h>
+#include <iostream>
+#include <vector>
+#include <cmath>
+#include "nvapi.h"
+#include <dxgi.h>
+
+#pragma comment(lib, "wbemuuid.lib")
+#pragma comment(lib, "nvapi64.lib")
+#pragma comment(lib, "dxgi.lib")
+
 int getgpuNvdia();
 int getgpuAMD();
 int getMemory();
 int getdisks();
-int getWinVersion();
 int getMotherBoard();
 
 std::string formfactor(UINT16 type);
@@ -15,6 +29,7 @@ int main() {
 	getMemory();
 	getgpuNvdia();
 	vendor();
+	getMotherBoard();
 }
 
 int getMemory() {
@@ -378,7 +393,163 @@ int vendor() {
 }
 
 int getgpuAMD() {
+	std::cout << "this feature will realease in a future version of system profiler" << std::endl;
 	return 0;
+}
+
+int getMotherBoard() {
+	
+	HRESULT hres;
+
+	hres = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+	if (FAILED(hres))
+	{
+		warn("failed to connect to the conn");
+		std::cout << GetLastError() << std::endl;
+		return EXIT_FAILURE;
+	}
+	hres = CoInitializeSecurity(
+		nullptr,
+		-1,
+		nullptr,
+		nullptr,
+		RPC_C_AUTHN_LEVEL_DEFAULT,
+		RPC_C_IMP_LEVEL_IMPERSONATE,
+		nullptr,
+		EOAC_NONE,
+		nullptr
+	);
+	if (FAILED(hres))
+	{
+		warn("failed to set security atributes on the conn");
+		std::cout << GetLastError() << std::endl;
+		return EXIT_FAILURE;
+	}
+	IWbemLocator* pLoc = nullptr;
+	hres = CoCreateInstance(
+		CLSID_WbemLocator,
+		nullptr,
+		CLSCTX_INPROC_SERVER,
+		IID_IWbemLocator,
+		(LPVOID*)&pLoc
+	);
+	if (FAILED(hres))
+	{
+		warn("failed to create the webm instance");
+		std::cout << GetLastError() << std::endl;
+		CoUninitialize();
+		return EXIT_FAILURE;
+	}
+	IWbemServices* pSvc = nullptr;
+
+	hres = pLoc->ConnectServer(
+		BSTR(L"ROOT\\CIMV2"),
+		NULL,
+		NULL,
+		0,
+		NULL,
+		0,
+		0,
+		&pSvc);
+	if (FAILED(hres))
+	{
+		pLoc->Release();
+		CoUninitialize();
+		warn("failed to connect to proxy");
+		std::cout << GetLastError() << std::endl;
+		return EXIT_FAILURE;
+	}
+	okay("connected to wmi");
+
+	hres = CoSetProxyBlanket(pSvc,
+		RPC_C_AUTHN_WINNT,
+		RPC_C_AUTHZ_NONE,
+		NULL,
+		RPC_C_AUTHN_LEVEL_CALL,
+		RPC_C_IMP_LEVEL_IMPERSONATE,
+		NULL,
+		EOAC_NONE
+	);
+	if (FAILED(hres))
+	{
+		pSvc->Release();
+		pLoc->Release();
+		CoUninitialize();
+		warn("failed to set proxy blanket");
+		std::cout << GetLastError() << std::endl;
+		return EXIT_FAILURE;
+	}
+	IEnumWbemClassObject* pEnumerator = nullptr;
+	hres = pSvc->ExecQuery(
+		bstr_t("WQL"),
+		bstr_t("SELECT * FROM Win32_BaseBoard"),
+		WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY,
+		nullptr,
+		&pEnumerator
+	);
+	if (FAILED(hres))
+	{
+		warn("failed to query physical memory information");
+		pSvc->Release();
+		pLoc->Release();
+		CoUninitialize();
+		std::cout << GetLastError() << std::endl;
+		return EXIT_FAILURE;
+	}
+	IWbemClassObject* pqueryObj = nullptr;
+	ULONG enReturn = NULL;
+
+	int i = 1;
+	while (pEnumerator) {
+		hres = pEnumerator->Next(WBEM_INFINITE, 1, &pqueryObj, &enReturn);
+
+		if (enReturn == 0) {
+			break;
+		}
+		VARIANT vtProp;
+		hres = pqueryObj->Get(L"Manufacturer", 0, &vtProp, 0, 0);
+		wprintf(L"motherboard Manufacterer: %s\n", vtProp.bstrVal);
+		VariantClear(&vtProp);
+		hres = pqueryObj->Get(L"SerialNumber", 0, &vtProp, 0, 0);
+		wprintf(L"motherboard model name: %s \n", vtProp.bstrVal);
+		pqueryObj->Release();
+		i++;
+	}
+	pqueryObj = nullptr;
+	enReturn = NULL;
+
+	pSvc->ExecQuery(
+		bstr_t("WQL"),
+		bstr_t("SELECT * FROM Win32_OperatingSystem"),
+		WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY,
+		nullptr,
+		&pEnumerator
+	);
+
+	while (pEnumerator) {
+		hres = pEnumerator->Next(WBEM_INFINITE, 1, &pqueryObj, &enReturn);
+		if (enReturn == 0) {
+			break;
+		}
+		VARIANT vtProp;
+		hres = pqueryObj->Get(L"Version", 0, &vtProp, 0, 0);
+		wprintf(L"windows version : %s\n", vtProp.bstrVal);
+		VariantClear(&vtProp);
+		hres = pqueryObj->Get(L"Name", 0, &vtProp, 0, 0);
+		wprintf(L"windows Name : %s\n", vtProp.bstrVal);
+		VariantClear(&vtProp);
+		pqueryObj->Release();
+	}
+
+
+
+	// Cleanup
+	pSvc->Release();
+	pLoc->Release();
+	pEnumerator->Release();
+	CoUninitialize();
+	return 0;
+
 }
 
 
