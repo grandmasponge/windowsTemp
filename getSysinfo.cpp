@@ -1,7 +1,7 @@
 #include "glassbox.hpp"
 
 #include<string>
-#include<Windows.h>
+
 #include <comdef.h>
 #include <Wbemidl.h>
 #include <stdio.h>
@@ -18,7 +18,7 @@
 int getgpuNvdia();
 int getgpuAMD();
 int getMemory();
-int getdisks();
+int getDisk();
 int getMotherBoard();
 
 std::string formfactor(UINT16 type);
@@ -26,10 +26,7 @@ int vendor();
 
 
 int main() {
-	getMemory();
-	getgpuNvdia();
-	vendor();
-	getMotherBoard();
+	getDisk();
 }
 
 int getMemory() {
@@ -511,7 +508,7 @@ int getMotherBoard() {
 		wprintf(L"motherboard Manufacterer: %s\n", vtProp.bstrVal);
 		VariantClear(&vtProp);
 		hres = pqueryObj->Get(L"SerialNumber", 0, &vtProp, 0, 0);
-		wprintf(L"motherboard model name: %s \n", vtProp.bstrVal);
+		wprintf(L"motherboard serial number name: %s \n", vtProp.bstrVal);
 		pqueryObj->Release();
 		i++;
 	}
@@ -533,7 +530,7 @@ int getMotherBoard() {
 		}
 		VARIANT vtProp;
 		hres = pqueryObj->Get(L"Version", 0, &vtProp, 0, 0);
-		wprintf(L"windows version : %s\n", vtProp.bstrVal);
+		wprintf(L"kernel version : %s\n", vtProp.bstrVal);
 		VariantClear(&vtProp);
 		hres = pqueryObj->Get(L"Name", 0, &vtProp, 0, 0);
 		wprintf(L"windows Name : %s\n", vtProp.bstrVal);
@@ -550,6 +547,48 @@ int getMotherBoard() {
 	CoUninitialize();
 	return 0;
 
+}
+
+int getDisk() {
+	DWORD drives = GetLogicalDrives();
+	std::vector<char> driveLetters;
+	for (int i = 0; i <= 26; i++) {
+		if (drives & (1 << i)) {
+			char letter = i + 65;
+			driveLetters.push_back(letter);
+		}
+	}
+	//get size of drive letters this is extermly useful
+	int sizedl = driveLetters.size();
+
+	for (int i = 0; i < sizedl; i++)
+	{
+		char letter = driveLetters[i];
+		VolumeInformation volInfo{
+			0,
+			0,
+			MAX_PATH +1,
+			0,
+			0,
+			0,
+			0,
+			MAX_PATH + 1
+		};
+		
+		GetVolumeInformationW(
+			TEXT("C:\\"),
+			volInfo.lpVolumeNameBuffer,
+			volInfo.nVolumeNameSize,
+			volInfo.lpVolumeSerialNumber,
+			volInfo.lpMaximumComponentLength,
+			volInfo.lpFileSystemFlags,
+			volInfo.lpFileSystemNameBuffer,
+			volInfo.nFileSystemNameSize
+			);
+		info("%d", volInfo.lpMaximumComponentLength);
+	}
+	
+	return 0;
 }
 
 
